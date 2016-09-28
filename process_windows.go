@@ -4,6 +4,7 @@ package ps
 
 import (
 	"fmt"
+	"strings"
 	"syscall"
 	"unsafe"
 )
@@ -40,9 +41,10 @@ type PROCESSENTRY32 struct {
 
 // WindowsProcess is an implementation of Process for Windows.
 type WindowsProcess struct {
-	pid  int
-	ppid int
-	exe  string
+	pid   int
+	ppid  int
+	cpids []int
+	exe   string
 }
 
 func (p *WindowsProcess) Pid() int {
@@ -51,6 +53,10 @@ func (p *WindowsProcess) Pid() int {
 
 func (p *WindowsProcess) PPid() int {
 	return p.ppid
+}
+
+func (p *WindowsProcess) CPids() []int {
+	return p.cpids
 }
 
 func (p *WindowsProcess) Executable() string {
@@ -116,4 +122,18 @@ func processes() ([]Process, error) {
 	}
 
 	return results, nil
+}
+
+func findProcessByExecutable(name string) ([]Process, error) {
+	var p []Process
+	procs, err := processes()
+	if err != nil {
+		return nil, err
+	}
+	for _, proc := range procs {
+		if strings.Compare(proc.Executable(), name) == 0 {
+			p = append(p, proc)
+		}
+	}
+	return p, nil
 }

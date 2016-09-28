@@ -16,9 +16,14 @@ type Process interface {
 	// PPid is the parent process ID for this process.
 	PPid() int
 
+	CPids() []int
+
 	// Executable name running this process. This is not a path to the
 	// executable.
 	Executable() string
+
+	// 运行时的完整命令
+	Cmdline() string
 }
 
 // Processes returns all processes.
@@ -31,10 +36,24 @@ func Processes() ([]Process, error) {
 	return processes()
 }
 
-// FindProcess looks up a single process by pid.
+// FindProcessByPid looks up a single process by pid.
 //
 // Process will be nil and error will be nil if a matching process is
 // not found.
 func FindProcess(pid int) (Process, error) {
 	return findProcess(pid)
 }
+
+// FindProcessByExecutable looks up a process by executable.
+//
+// Process will be nil and error will be nil if a matching process is
+// not found.
+func FindProcessByExecutable(name string) ([]Process, error) {
+	return findProcessByExecutable(name)
+}
+
+func FindProcessByCmdline(str string) ([]Process, error) {
+	return findProcessByCmdline(str)
+}
+
+

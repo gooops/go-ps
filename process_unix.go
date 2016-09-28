@@ -14,13 +14,14 @@ import (
 // UnixProcess is an implementation of Process that contains Unix-specific
 // fields and information.
 type UnixProcess struct {
-	pid   int
-	ppid  int
-	state rune
-	pgrp  int
-	sid   int
-
-	binary string
+	pid     int
+	ppid    int
+	state   rune
+	pgrp    int
+	sid     int
+	cpids   []int
+	binary  string
+	cmdline string
 }
 
 func (p *UnixProcess) Pid() int {
@@ -31,8 +32,21 @@ func (p *UnixProcess) PPid() int {
 	return p.ppid
 }
 
+func (p *UnixProcess) CPids() []int {
+	err := p.RefreshCPids()
+	if err != nil {
+		return nil
+	}
+	return p.cpids
+}
+
 func (p *UnixProcess) Executable() string {
 	return p.binary
+}
+
+func (p *UnixProcess) Cmdline() string {
+	// 将cmdline中的"^@"替换为空格
+	return strings.Replace(p.cmdline, string([]byte{0x00}), " ", -1)
 }
 
 // Refresh reloads all the data associated with this process.
@@ -58,6 +72,25 @@ func (p *UnixProcess) Refresh() error {
 		&p.pgrp,
 		&p.sid)
 
+	cmdlinebuf, err := ioutil.ReadFile(fmt.Sprintf("/proc/%d/cmdline", p.pid))
+	if err != nil {
+		return err
+	}
+
+	p.cmdline = string(cmdlinebuf)
+	return err
+}
+
+func (p *UnixProcess) RefreshCPids() error {
+	procs, err := Processes()
+	if err != nil {
+		return err
+	}
+	for _, proc := range procs {
+		if proc.PPid() == p.pid {
+			p.cpids = append(p.cpids, proc.Pid())
+		}
+	}
 	return err
 }
 
@@ -73,6 +106,34 @@ func findProcess(pid int) (Process, error) {
 	}
 
 	return newUnixProcess(pid)
+}
+
+func findProcessByExecutable(name string) ([]Process, error) {
+	var p []Process
+	procs, err := processes()
+	if err != nil {
+		return nil, err
+	}
+	for _, proc := range procs {
+		if strings.Compare(proc.Executable(), name) == 0 {
+			p = append(p, proc)
+		}
+	}
+	return p, nil
+}
+
+func findProcessByCmdline(str string) ([]Process, error) {
+	var p []Process
+	procs, err := processes()
+	if err != nil {
+		return nil, err
+	}
+	for _, proc := range procs {
+		if strings.Contains(proc.Cmdline(), str) {
+			p = append(p, proc)
+		}
+	}
+	return p, nil
 }
 
 func processes() ([]Process, error) {
@@ -110,7 +171,6 @@ func processes() ([]Process, error) {
 			if err != nil {
 				continue
 			}
-
 			p, err := newUnixProcess(int(pid))
 			if err != nil {
 				continue
@@ -119,7 +179,6 @@ func processes() ([]Process, error) {
 			results = append(results, p)
 		}
 	}
-
 	return results, nil
 }
 
