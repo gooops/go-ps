@@ -17,6 +17,7 @@ var darwinProcs []Process
 type DarwinProcess struct {
 	pid    int
 	ppid   int
+	cpids   []int
 	binary string
 }
 
@@ -26,6 +27,27 @@ func (p *DarwinProcess) Pid() int {
 
 func (p *DarwinProcess) PPid() int {
 	return p.ppid
+}
+
+func (p *DarwinProcess) CPids() []int {
+	err := p.RefreshCPids()
+	if err != nil {
+		return nil
+	}
+	return p.cpids
+}
+
+func (p *DarwinProcess) RefreshCPids() error {
+	procs, err := Processes()
+	if err != nil {
+		return err
+	}
+	for _, proc := range procs {
+		if proc.PPid() == p.pid {
+			p.cpids = append(p.cpids, proc.Pid())
+		}
+	}
+	return err
 }
 
 func (p *DarwinProcess) Executable() string {
